@@ -37,6 +37,7 @@ function Pill({ tone = 'muted', className = '', title, children }: {
 
 interface ListRowProps {
   account: Account
+  rowIndex: number
   isSelected: boolean
   isCurrent: boolean
   isRefreshing: boolean
@@ -63,6 +64,7 @@ interface ListRowProps {
 
 const ListRow = memo(function ListRow({
   account,
+  rowIndex,
   isSelected,
   isCurrent,
   isRefreshing,
@@ -120,9 +122,11 @@ const ListRow = memo(function ListRow({
       : { icon: LogIn, label: t('accountCard.LogIn'), onClick: () => onLogin(account), disabled: isSwitching || isUnavailable },
     { divider: true },
     { label: account.enabled === false ? '启用账号' : '禁用账号', onClick: () => onToggleEnabled?.(account, account.enabled === false) },
+    /*
     ...(overageCapability === 'OVERAGE_CAPABLE' ? [
       { label: overageStatus === 'ENABLED' ? '关闭超额' : '开启超额', onClick: () => onToggleOverage?.(account, overageStatus !== 'ENABLED'), disabled: isTogglingOverage },
     ] : []),
+    */
     { icon: Trash2, label: t('accountCard.delete'), onClick: () => onDelete(account.id), danger: true },
     ...(account.provider !== 'Enterprise' && !isBanned && onDeleteRemote ? [
       { icon: UserX, label: t('accountCard.deleteRemote'), onClick: () => onDeleteRemote(account), danger: true },
@@ -166,8 +170,13 @@ const ListRow = memo(function ListRow({
         className="shrink-0 cursor-pointer"
       />
 
+      {/* 序号 */}
+      <div className="w-6 shrink-0 text-center text-[11px] font-medium text-muted-foreground tabular-nums">
+        {rowIndex + 1}
+      </div>
+
       {/* 邮箱 + 备注 */}
-      <div className="w-36 shrink-0 min-w-0">
+      <div className="w-45 shrink-0 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium truncate text-foreground">
             {account.email ? maskEmail(account.email) : getAccountDisplayName(account)}
@@ -180,17 +189,17 @@ const ListRow = memo(function ListRow({
       </div>
 
       {/* Provider */}
-      <Pill tone={providerTone} className="w-16 shrink-0">
+      <Pill tone={providerTone} className="w-18 shrink-0">
         {getProviderDisplayName(account.provider) || '—'}
       </Pill>
 
       {/* 订阅 */}
-      <Pill tone={subscriptionTone} className="w-16 shrink-0">
+      <Pill tone={subscriptionTone} className="w-30 shrink-0">
         {subscriptionTitle || 'Free'}
       </Pill>
 
       {/* 配额 */}
-      <div className="w-24 shrink-0">
+      <div className="w-26 shrink-0 text-center">
         <div className="flex items-center justify-between">
           <span className={`text-[11px] font-bold ${isOverage ? 'text-purple-500' : used >= limit && limit > 0 ? 'text-red-500' : 'text-foreground'}`}>
             {isOverage ? formatUsage(limit) : formatUsage(used)}
@@ -211,23 +220,25 @@ const ListRow = memo(function ListRow({
             )}
           </div>
         )}
+        {/*
         {!isOverage && overageCapability === 'OVERAGE_CAPABLE' && (
           <span className={`text-[9px] mt-0.5 block ${overageStatus === 'ENABLED' ? 'text-green-500' : 'text-muted-foreground'}`}>
             {overageStatus === 'ENABLED' ? '⚡超额已开' : '⚡可开超额'}
           </span>
         )}
+        */}
       </div>
 
       {/* 状态 */}
       <Pill
         tone={statusMeta.key === 'active' ? 'green' : 'red'}
-        className="w-12 shrink-0 uppercase"
+        className="w-20 shrink-0 uppercase"
       >
         {statusMeta.label}
       </Pill>
 
       {/* 过期 / 试用 */}
-      <div className="w-28 shrink-0 text-[10px] text-muted-foreground leading-tight">
+      <div className="w-30 shrink-0 text-[10px] text-muted-foreground leading-tight text-center">
         {account.expiresAt ? (
           <span className={isExpired ? 'text-red-500 font-bold' : ''}>
             {account.expiresAt.slice(5, 16).replace('/', '-')}
@@ -241,7 +252,7 @@ const ListRow = memo(function ListRow({
       </div>
 
       {/* 分组 */}
-      <div className="w-16 shrink-0">
+      <div className="w-16 shrink-0 text-center">
         {account.groupId
           ? (() => {
             const group = groupMap.get(account.groupId)
@@ -259,29 +270,29 @@ const ListRow = memo(function ListRow({
       </div>
 
       {/* 标签 */}
-      <div className="flex-[1.5] min-w-[80px] min-w-0">
+      <div className="w-40 shrink-0 min-w-0">
         {account.tagLinks && account.tagLinks.length > 0 ? (
-          <div className="flex items-center gap-1 flex-wrap">
-            {account.tagLinks.slice(0, 3).map(tagLink => {
+          <div className="flex items-center gap-1 overflow-hidden">
+            {account.tagLinks.slice(0, 2).map(tagLink => {
               const tag = tagMap.get(tagLink.tagId)
               const tagName = tag?.name || tagLink.tagName || '标签'
               const tagColor = tag?.color || '#888888'
               return (
                 <span
                   key={tagLink.tagId}
-                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium truncate max-w-[100px] border border-border/20"
+                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium truncate max-w-[64px] border border-border/20 shrink-0"
                   style={{ backgroundColor: `${tagColor}20`, color: tagColor }}
                 >
                   {tagName}
                 </span>
               )
             })}
-            {account.tagLinks.length > 3 && <span className="text-[10px] text-muted-foreground">+{account.tagLinks.length - 3}</span>}
+            {account.tagLinks.length > 2 && <span className="text-[10px] text-muted-foreground shrink-0">+{account.tagLinks.length - 2}</span>}
           </div>
         ) : <span className="text-xs text-muted-foreground">—</span>}
       </div>
 
-      {/* 操作按钮（hover 时绝对定位浮起，避免占用列宽） */}
+      {/* 操作按钮（hover 时悬浮覆盖，避免常驻占用列宽） */}
       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-card/95 backdrop-blur-sm rounded-md shadow-sm border border-border px-1 py-1">
         {isCurrent ? (
           <button
@@ -366,6 +377,7 @@ interface AccountListViewProps {
   onAdd: () => void
   onExport?: () => void
   selectedCount?: number
+  onBatchRefresh?: () => void
   onBatchEdit?: () => void
   onBatchDelete?: () => void
   accountRowStateById?: Record<string, { isRefreshing?: boolean; isRefreshingToken?: boolean; isSwitching?: boolean; isTogglingOverage?: boolean }>
@@ -398,6 +410,7 @@ function AccountListView({
   onAdd,
   onExport,
   selectedCount = 0,
+  onBatchRefresh,
   onBatchEdit,
   onBatchDelete,
   accountRowStateById = {},
@@ -477,6 +490,13 @@ function AccountListView({
           {selectedCount > 0 && (
             <>
               <button
+                onClick={onBatchRefresh}
+                className="h-7 px-2.5 rounded-md border border-border bg-card text-foreground text-xs font-medium hover:bg-muted/50 inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                title={t('accounts.refreshList')}
+              >
+                <RefreshCw size={13} />刷新
+              </button>
+              <button
                 onClick={onBatchEdit}
                 className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 inline-flex items-center gap-1 cursor-pointer shadow-sm"
                 title={t('accounts.batchEditTagsAndGroups')}
@@ -512,18 +532,20 @@ function AccountListView({
       {/* 表头 */}
       <div className="flex items-center gap-3 px-3 h-9 bg-muted/50 border border-border rounded-t-md text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
         <div className="w-4" />
-        <div className="w-36">邮箱</div>
-        <div className="w-16 text-center">来源</div>
-        <div className="w-16 text-center">订阅</div>
-        <button type="button" onClick={() => handleSort('usage')} className="w-24 text-left hover:text-primary transition-colors">
+        <div className="w-6 text-center">序号</div>
+        <div className="w-45">邮箱</div>
+        <div className="w-18 text-center">来源</div>
+        <div className="w-30 text-center">订阅</div>
+        <button type="button" onClick={() => handleSort('usage')} className="w-26 text-center hover:text-primary transition-colors">
           配额<SortIcon field="usage" />
         </button>
-        <div className="w-12 text-center">状态</div>
-        <button type="button" onClick={() => handleSort('trial')} className="w-28 text-left hover:text-primary transition-colors">
+        <div className="w-20 text-center">状态</div>
+        <button type="button" onClick={() => handleSort('trial')} className="w-30 text-center hover:text-primary transition-colors">
           过期 / 试用<SortIcon field="trial" />
         </button>
-        <div className="w-16">分组</div>
-        <div className="flex-[1.5] min-w-[80px]">标签</div>
+        <div className="w-16 text-center">分组</div>
+        <div className="w-40">标签</div>
+        <div className="flex-1" />
       </div>
 
       {/* 列表 */}
@@ -544,6 +566,7 @@ function AccountListView({
               >
                 <ListRow
                   account={acc}
+                  rowIndex={vRow.index}
                   isSelected={_selectedIdsSet.has(acc.id)}
                   isCurrent={!!localRefreshToken && acc.refreshToken === localRefreshToken}
                   isRefreshing={accountRowStateById[acc.id]?.isRefreshing ?? false}

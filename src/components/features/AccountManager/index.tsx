@@ -684,6 +684,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           onAdd={() => setShowImportModal(true)}
           onExport={handleExportSelected}
           selectedCount={selectedIds.length}
+          onBatchRefresh={loadAccounts}
           onBatchEdit={() => setShowBatchEditModal(true)}
           onBatchDelete={onBatchDelete}
           localToken={localToken}
@@ -714,6 +715,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           onAdd={() => setShowImportModal(true)}
           onExport={handleExportSelected}
           selectedCount={selectedIds.length}
+          onBatchRefresh={loadAccounts}
           onBatchEdit={() => setShowBatchEditModal(true)}
           onBatchDelete={onBatchDelete}
           localToken={localToken}

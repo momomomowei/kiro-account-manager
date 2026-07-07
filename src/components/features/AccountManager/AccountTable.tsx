@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState, useEffect, useCallback, memo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Users, Plus, Edit2, Copy, KeyRound , Eye , Key, Trash2, UserX, LogIn, Download } from 'lucide-react'
+import { Users, Plus, Edit2, Copy, KeyRound , Eye , Key, Trash2, UserX, LogIn, Download, RefreshCw } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useApp } from '../../../hooks/useApp'
 import { getAccountStatusMeta, isBannedStatus, isUnavailableStatus } from '../../../utils/accountStatus'
@@ -120,6 +120,7 @@ function AccountTable({
   onAdd,
   onExport,
   selectedCount = 0,
+  onBatchRefresh,
   onBatchEdit,
   onBatchDelete,
   localToken,
@@ -219,6 +220,13 @@ function AccountTable({
             </span>
             {selectedCount > 0 && (
               <>
+                <button
+                  onClick={onBatchRefresh}
+                  className="h-7 px-2.5 rounded-md border border-border bg-card text-foreground text-xs font-medium hover:bg-muted/50 inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                  title={t('accounts.refreshList')}
+                >
+                  <RefreshCw size={13} />刷新
+                </button>
                 <button
                   onClick={onBatchEdit}
                   className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 inline-flex items-center gap-1 cursor-pointer shadow-sm"

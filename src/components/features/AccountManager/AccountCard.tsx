@@ -140,6 +140,7 @@ const AccountCard = memo(function AccountCard({
             title={t('accountCard.enableDisableAccount')}
           />
         </div>
+        {/*
         {account.usageData?.subscriptionInfo?.overageCapability === 'OVERAGE_CAPABLE' && (
           <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
             <span className="text-[9px] text-muted-foreground">⚡</span>
@@ -152,6 +153,7 @@ const AccountCard = memo(function AccountCard({
             />
           </div>
         )}
+        */}
         <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${statusMeta.key === 'active'
           ? "bg-green-500/10 text-green-500 border border-green-500/20"
           : statusMeta.tone === 'danger'
