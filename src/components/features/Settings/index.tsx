@@ -25,7 +25,7 @@ function Settings() {
 
     const [aiModel, setAiModel] = useState('claude-sonnet-4.5')
     const [lockModel, setLockModel] = useState(false)
-    const [autoRefresh, setAutoRefresh] = useState(true)
+    const [autoRefresh, setAutoRefresh] = useState(false)
     const [autoRefreshInterval, setAutoRefreshInterval] = useState(50) // 分钟
     const [httpProxy, setHttpProxy] = useState('')
     const [originalProxy, setOriginalProxy] = useState('') // 原始代理值，用于判断是否修改
@@ -112,7 +112,7 @@ function Settings() {
             // 从应用设置读取
             if (appSettings) {
                 setLockModel(appSettings.lockModel ?? false)
-                setAutoRefresh(appSettings.autoRefresh ?? true)
+                setAutoRefresh(appSettings.autoRefresh ?? false)
                 setAutoRefreshInterval(appSettings.autoRefreshInterval ?? 50)
                 const browser = appSettings.browserPath || ''
                 setBrowserPath(browser)

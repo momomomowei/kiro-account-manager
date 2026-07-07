@@ -162,7 +162,9 @@ export function useAccounts() {
       const { writeTextFile } = await import('@tauri-apps/plugin-fs')
       const { downloadDir } = await import('@tauri-apps/api/path')
       
-      const defaultName = `kiro-accounts-${selectedIds.length}-${new Date().toISOString().slice(0, 10)}.json`
+      const now = new Date()
+      const timestamp = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+      const defaultName = `kiro-${selectedIds.length}-${timestamp}.json`
       const defaultDir = await downloadDir()
       const sep = defaultDir.includes('\\') ? '\\' : '/'
       

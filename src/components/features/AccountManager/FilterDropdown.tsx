@@ -6,12 +6,12 @@ import { useTranslation } from 'react-i18next'
 import SearchableTagSelect from './SearchableTagSelect'
 import { getThemeAccent } from '../KiroConfig/themeAccent'
 
-import { buildFilterSummaryItems, countActiveFilters } from './utils/filterDropdownState'
+import { buildFilterSummaryItems } from './utils/filterDropdownState'
 import { isPointerInsideContainer } from './utils/pointerInside'
 import React from 'react'
 
-const SUBSCRIPTION_OPTIONS = [
-  { value: '', label: '全部' },
+export const SUBSCRIPTION_OPTIONS = [
+  { value: '', label: '全部订阅' },
   { value: 'FREE', label: 'FREE' },
   { value: 'KIRO FREE', label: 'KIRO FREE' },
   { value: 'KIRO PRO', label: 'KIRO PRO' },
@@ -19,16 +19,16 @@ const SUBSCRIPTION_OPTIONS = [
   { value: 'KIRO PRO MAX', label: 'KIRO PRO MAX' },
   { value: 'KIRO POWER', label: 'KIRO POWER' },
 ]
-const STATUS_OPTIONS = [
-  { value: '', label: '全部' },
+export const STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
   { value: 'normal', label: '正常' },
   { value: 'capped', label: '封顶' },
   { value: 'banned', label: '封禁' },
   { value: 'invalid', label: '失效' },
   { value: 'expired', label: '过期' },
 ]
-const PROVIDER_OPTIONS = [
-  { value: '', label: '全部' },
+export const PROVIDER_OPTIONS = [
+  { value: '', label: '全部类型' },
   { value: 'Google', label: 'Google' },
   { value: 'Github', label: 'Github' },
   { value: 'BuilderId', label: 'BuilderId' },
@@ -183,17 +183,21 @@ function FilterDropdown({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  const activeCount = countActiveFilters({ filters, selectedGroup, selectedTag })
+  const activeCount = [
+    filters?.usageRange ? 1 : 0,
+    filters?.enabledStatus ? 1 : 0,
+    selectedTag ? 1 : 0,
+  ].reduce((total, count) => total + count, 0)
   const summaryItems = buildFilterSummaryItems({
-    filters,
-    selectedGroup,
+    filters: {
+      usageRange: filters?.usageRange,
+      enabledStatus: filters?.enabledStatus,
+    },
     selectedTag,
-    allGroups,
     allTags})
 
   const clearAll = () => {
-    onFiltersChange({ subscriptions: [], statuses: [], providers: [], usageRange: null, enabledStatus: null })
-    onGroupFilter?.(null)
+    onFiltersChange({ ...filters, usageRange: null, enabledStatus: null })
     onTagFilter(null)
   }
 
@@ -297,33 +301,6 @@ function FilterDropdown({
             <SectionCard title="条件筛选">
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <FilterSelect
-                  label={t('filter.subscription')}
-                  value={filters.subscriptions?.length > 0 ? filters.subscriptions[0] : ''}
-                  options={SUBSCRIPTION_OPTIONS}
-                  onChange={(value: string) => onFiltersChange({ ...filters, subscriptions: [value] })}
-                  onClear={() => onFiltersChange({ ...filters, subscriptions: [] })}
-                  accent={accent}
-                />
-
-                <FilterSelect
-                  label={t('filter.status')}
-                  value={filters.statuses?.length > 0 ? filters.statuses[0] : ''}
-                  options={STATUS_OPTIONS}
-                  onChange={(value: string) => onFiltersChange({ ...filters, statuses: [value] })}
-                  onClear={() => onFiltersChange({ ...filters, statuses: [] })}
-                  accent={accent}
-                />
-
-                <FilterSelect
-                  label={t('filter.provider')}
-                  value={filters.providers?.length > 0 ? filters.providers[0] : ''}
-                  options={PROVIDER_OPTIONS}
-                  onChange={(value: string) => onFiltersChange({ ...filters, providers: [value] })}
-                  onClear={() => onFiltersChange({ ...filters, providers: [] })}
-                  accent={accent}
-                />
-
-                <FilterSelect
                   label="使用量"
                   value={filters.usageRange || ''}
                   options={USAGE_RANGE_OPTIONS}
@@ -340,27 +317,6 @@ function FilterDropdown({
                   onClear={() => onFiltersChange({ ...filters, enabledStatus: null })}
                   accent={accent}
                 />
-
-                {allGroups.length > 0 && (
-                  <FilterField
-                    label={t('groups.title') || '分组'}
-                    active={Boolean(selectedGroup)}
-                    accent={accent}
-                    fullWidth
-                  >
-                    <SearchableTagSelect
-                      tags={allGroups}
-                      value={selectedGroup}
-                      onChange={onGroupFilter}
-                      placeholder={t('groups.searchPlaceholder') || '搜索分组...'}
-                      showAllOption={true}
-                      showNoneOption={true}
-                      allLabel={t('groups.all') || '全部'}
-                      noneLabel={t('groups.noGroup') || '无分组'}
-                      hasLabel={t('groups.hasGroup') || '有分组'}
-                    />
-                  </FilterField>
-                )}
               </div>
             </SectionCard>
           </div>

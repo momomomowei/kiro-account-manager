@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, type Dispatch, type SetStateAction } from 'react'
+import { flushSync } from 'react-dom'
 import { Tabs, TabsContent, TabsList } from '@/components/ui/tabs'
 import { Stack, Group } from '@/components/shared/layout'
 
@@ -31,6 +32,14 @@ interface ImportAccountModalProps {
   onNavigate?: (path: string) => void;
 }
 
+type ImportListItem = {
+  key: string;
+  title: string;
+  subtitle?: string;
+  status: 'pending' | 'importing' | 'success' | 'failed';
+  message?: string;
+}
+
 function LegacyButton({ color, leftSection, className = '', children, ...props }: any) {
   const colorClass = color === 'red'
     ? 'text-red-600 hover:text-red-700'
@@ -47,19 +56,19 @@ function LegacyButton({ color, leftSection, className = '', children, ...props }
   )
 }
 
-function FileButton({ onChange, accept, children }: any) {
+function FileButton({ onChange, accept, multiple = false, children }: any) {
   const inputRef = useRef<HTMLInputElement>(null)
   const triggerProps = { onClick: () => inputRef.current?.click() }
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null
-    if (file) {
-      await onChange(file)
+    const files = Array.from(event.target.files || [])
+    if (files.length > 0) {
+      await onChange(multiple ? files : files[0])
     }
     event.target.value = ''
   }
   return (
     <>
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={handleChange} />
+      <input ref={inputRef} type="file" accept={accept} multiple={multiple} className="hidden" onChange={handleChange} />
       {children(triggerProps)}
     </>
   )
@@ -139,6 +148,7 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
   const [parseResult, setParseResult] = useState<any>(null)
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+  const [importItems, setImportItems] = useState<ImportListItem[]>([])
   const [importResult, setImportResult] = useState<any>(null)
 
   // 从 Kiro 导入相关状态
@@ -147,6 +157,7 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
   const [kiroError, setKiroError] = useState<string | null>(null)
   const [kiroImporting, setKiroImporting] = useState(false)
   const [kiroProgress, setKiroProgress] = useState({ current: 0, total: 0 })
+  const [kiroImportItems, setKiroImportItems] = useState<ImportListItem[]>([])
   const [kiroResult, setKiroResult] = useState<any>(null)
 
   // 从 kiro-cli 导入相关状态
@@ -276,14 +287,42 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
     }
   }
 
-  const handleFileSelect = async (file: File) => {
-    if (!file) return
-    const text = await file.text()
+  const handleFileSelect = async (files: File | File[]) => {
+    const selectedFiles = Array.isArray(files) ? files : [files]
+    if (selectedFiles.length === 0) return
+
+    const merged: any[] = []
+    const errors: string[] = []
+
+    for (const file of selectedFiles) {
+      try {
+        const text = await file.text()
+        const data = JSON.parse(text)
+        if (Array.isArray(data)) {
+          merged.push(...data)
+        } else {
+          merged.push(data)
+        }
+      } catch (e: any) {
+        errors.push(`${file.name}: ${e.message}`)
+      }
+    }
+
+    if (errors.length > 0) {
+      setParseResult({ valid: [], invalid: [], errors: errors.map(error => `JSON 解析失败: ${error}`) })
+      return
+    }
+
+    const text = JSON.stringify(merged, null, 2)
     setJsonText(text)
     parseJson(text)
   }
 
-  const runConcurrent = async (items: any[], handler: any, onProgress: any) => {
+  const updateImportItem = (setItems: Dispatch<SetStateAction<ImportListItem[]>>, key: string, updates: Partial<ImportListItem>) => {
+    setItems(prev => prev.map(item => item.key === key ? { ...item, ...updates } : item))
+  }
+
+  const runConcurrent = async (items: any[], handler: any, onProgress: any, onItemStart?: any, onItemFinish?: any) => {
     const results = []
     let completed = 0
     const concurrency = getConcurrency(items.length)
@@ -292,9 +331,11 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
       const batch = items.slice(i, i + concurrency)
       const batchResults = await Promise.all(
         batch.map(async (item) => {
+          onItemStart?.(item)
           const result = await handler(item)
           completed++
           onProgress(completed)
+          onItemFinish?.(item, result, completed)
           return result
         })
       )
@@ -306,8 +347,16 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
   const handleJsonImport = async () => {
     if (!parseResult?.valid.length) return
 
-    setImporting(true)
-    setImportProgress({ current: 0, total: parseResult.valid.length })
+    flushSync(() => {
+      setImporting(true)
+      setImportProgress({ current: 0, total: parseResult.valid.length })
+      setImportItems(parseResult.valid.map((item: any) => ({
+        key: String(item._index),
+        title: `第 ${item._index + 1} 条`,
+        subtitle: `${item._inferredProvider || item.provider || '未知类型'} · ${item.refreshToken ? `${String(item.refreshToken).slice(0, 10)}...` : '无 refreshToken'}`,
+        status: 'pending'
+      })))
+    })
 
     const added: any[] = []
     const updated: any[] = []
@@ -359,7 +408,25 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
     const results = await runConcurrent(
       parseResult.valid,
       importOne,
-      (completed: number) => setImportProgress({ current: completed, total: parseResult.valid.length })
+      (completed: number) => {
+        flushSync(() => {
+          setImportProgress({ current: completed, total: parseResult.valid.length })
+        })
+      },
+      (item: any) => {
+        flushSync(() => {
+          updateImportItem(setImportItems, String(item._index), { status: 'importing', message: '导入中' })
+        })
+      },
+      (item: any, result: any) => {
+        flushSync(() => {
+          updateImportItem(setImportItems, String(item._index), {
+            status: result.success ? 'success' : 'failed',
+            title: result.email || `第 ${item._index + 1} 条`,
+            message: result.success ? (result.isNew ? '新增成功' : '更新成功') : result.error
+          })
+        })
+      }
     )
 
     results.forEach(r => {
@@ -382,14 +449,22 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
   const handleKiroImport = async () => {
     if (kiroAccounts.length === 0) return
 
-    setKiroImporting(true)
-    setKiroProgress({ current: 0, total: kiroAccounts.length })
+    flushSync(() => {
+      setKiroImporting(true)
+      setKiroProgress({ current: 0, total: kiroAccounts.length })
+      setKiroImportItems(kiroAccounts.map((account: any, index: number) => ({
+        key: String(index),
+        title: getAccountDisplayName(account),
+        subtitle: `${getProviderDisplayName(account.provider)} · ${account.authMethod || '未知方式'}`,
+        status: 'pending'
+      })))
+    })
 
     const added: any[] = []
     const updated: any[] = []
     const failed: any[] = []
 
-    const importOne = async (account: any) => {
+    const importOne = async (account: any, index?: number) => {
       try {
         let result: any
         if (account.authMethod === 'IdC') {
@@ -432,9 +507,27 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
     }
 
     const results = await runConcurrent(
-      kiroAccounts,
+      kiroAccounts.map((account, index) => ({ ...account, _importIndex: index })),
       importOne,
-      (completed: number) => setKiroProgress({ current: completed, total: kiroAccounts.length })
+      (completed: number) => {
+        flushSync(() => {
+          setKiroProgress({ current: completed, total: kiroAccounts.length })
+        })
+      },
+      (account: any) => {
+        flushSync(() => {
+          updateImportItem(setKiroImportItems, String(account._importIndex), { status: 'importing', message: '导入中' })
+        })
+      },
+      (account: any, result: any) => {
+        flushSync(() => {
+          updateImportItem(setKiroImportItems, String(account._importIndex), {
+            status: result.success ? 'success' : 'failed',
+            title: result.email || getAccountDisplayName(account),
+            message: result.success ? (result.isNew ? '新增成功' : '更新成功') : result.error
+          })
+        })
+      }
     )
 
     results.forEach(r => {
@@ -460,8 +553,10 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
   const handleKiroCliImport = async () => {
     if (!kiroCliDbPath) return
 
-    setKiroCliImporting(true)
-    setKiroCliResult(null)
+    flushSync(() => {
+      setKiroCliImporting(true)
+      setKiroCliResult(null)
+    })
 
     try {
       const result = await importFromKiroCli(kiroCliDbPath)
@@ -528,6 +623,70 @@ function ImportAccountModal({ onClose, onSuccess, onNavigate }: ImportAccountMod
   </Stack>
 )
 
+const renderImportingList = (items: ImportListItem[], progress: { current: number; total: number }, title: string) => (
+  <div className="px-6 py-6">
+    <div className="rounded-xl bg-muted/30 border border-border overflow-hidden">
+      <div className="p-5 border-b border-border">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-muted/30">
+            <Loader2 size={20} className="text-primary animate-spin" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-foreground">{title}</div>
+            <div className="text-sm text-muted-foreground">{progress.current}/{progress.total}</div>
+          </div>
+        </div>
+        <Progress
+          value={progress.total > 0 ? (progress.current / progress.total * 100) : 0}
+          className="h-3 rounded-xl"
+        />
+      </div>
+
+      <div className="max-h-[280px] overflow-y-auto divide-y divide-border">
+        {items.map(item => (
+          <div key={item.key} className="flex items-center gap-3 px-5 py-3">
+            <div className="w-6 h-6 flex items-center justify-center shrink-0">
+              {item.status === 'importing' ? (
+                <Loader2 size={16} className="text-primary animate-spin" />
+              ) : item.status === 'success' ? (
+                <CheckCircle size={16} className="text-green-500" />
+              ) : item.status === 'failed' ? (
+                <AlertCircle size={16} className="text-red-500" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-foreground truncate">{item.title}</div>
+              {item.subtitle && <div className="text-xs text-muted-foreground truncate">{item.subtitle}</div>}
+            </div>
+            <div
+              className={`text-xs font-medium shrink-0 ${
+                item.status === 'success'
+                  ? 'text-green-500'
+                  : item.status === 'failed'
+                    ? 'text-red-500'
+                    : item.status === 'importing'
+                      ? 'text-primary'
+                      : 'text-muted-foreground'
+              }`}
+              title={item.message}
+            >
+              {item.status === 'success'
+                ? item.message || '成功'
+                : item.status === 'failed'
+                  ? item.message || '失败'
+                  : item.status === 'importing'
+                    ? '导入中'
+                    : '等待中'}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
+
 return (
   <DialogRoot open={true} onOpenChange={(open) => !open && onClose()}>
     <DialogContent maxWidth="700px">
@@ -565,28 +724,17 @@ return (
             )}
           </div>
         ) : importing || kiroImporting || kiroCliImporting ? (
-          <div className="px-6 py-6">
-            <div className={`p-5 rounded-xl bg-muted/30 border border-border`}>
-              <div className="flex items-center gap-4 mb-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-muted/30`}>
-                  <Loader2 size={20} className={"text-primary animate-spin"} />
-                </div>
-                <div>
-                  <div className={`font-medium text-foreground`}>
-                    {importing ? t('import.importing') : kiroImporting ? '正在从 Kiro 导入...' : '正在从 kiro-cli 导入...'}
-                  </div>
-                  <div className={`text-sm text-muted-foreground`}>
-                    {kiroCliImporting ? '请稍候...' : `${(importing ? importProgress : kiroProgress).current}/${(importing ? importProgress : kiroProgress).total}`}
-                  </div>
-                </div>
-              </div>
-              <Progress
-                value={((importing ? importProgress : kiroProgress).total > 0) ? ((importing ? importProgress : kiroProgress).current /
-                  (importing ? importProgress : kiroProgress).total * 100) : 0}
-                className="h-3 rounded-xl"
-              />
-            </div>
-          </div>
+          kiroCliImporting ? (
+            renderImportingList(
+              [{ key: 'kiro-cli', title: kiroCliDbPath || 'kiro-cli 数据库', subtitle: '从 kiro-cli 导入', status: 'importing', message: '导入中' }],
+              { current: 0, total: 1 },
+              '正在从 kiro-cli 导入...'
+            )
+          ) : importing ? (
+            renderImportingList(importItems, importProgress, t('import.importing'))
+          ) : (
+            renderImportingList(kiroImportItems, kiroProgress, '正在从 Kiro 导入...')
+          )
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="px-6 pt-2 pb-3 border-b-0 bg-transparent h-auto">
@@ -633,7 +781,7 @@ return (
             <TabsContent value="json" className="px-6 pb-4 pt-4 outline-none">
               <Stack gap="lg">
                 <Group>
-                  <FileButton onChange={handleFileSelect} accept=".json">
+                  <FileButton onChange={handleFileSelect} accept=".json" multiple>
                     {(props: any) => <LegacyButton {...props} leftSection={<FileJson size={16} />}>{t('import.selectFile')}</LegacyButton>}
                   </FileButton>
                   <LegacyButton
@@ -683,8 +831,9 @@ return (
                   <Stack gap="xs">
                     {parseResult.valid.length > 0 && (
                       <Alert variant="success">
-                        <CheckCircle size={16} />
-                        {t('import.parseSuccess')}: {parseResult.valid.length} {t('import.validRecords')}
+                        <div className="text-sm font-medium">
+                          {t('import.parseSuccess')}: {parseResult.valid.length} {t('import.validRecords')}
+                        </div>
                       </Alert>
                     )}
                     {parseResult.errors.length > 0 && (

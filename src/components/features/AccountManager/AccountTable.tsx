@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState, useEffect, useCallback, memo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Users, Plus, Edit2, Copy, KeyRound , Eye , Key, Trash2, UserX, LogIn } from 'lucide-react'
+import { Users, Plus, Edit2, Copy, KeyRound , Eye , Key, Trash2, UserX, LogIn, Download } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useApp } from '../../../hooks/useApp'
 import { getAccountStatusMeta, isBannedStatus, isUnavailableStatus } from '../../../utils/accountStatus'
@@ -118,6 +118,10 @@ function AccountTable({
   onDelete,
   onDeleteRemote,
   onAdd,
+  onExport,
+  selectedCount = 0,
+  onBatchEdit,
+  onBatchDelete,
   localToken,
   tagDefinitions = [],
   groupDefinitions = [],
@@ -209,9 +213,43 @@ function AccountTable({
               {selectedIds.length > 0 ? `${t('common.selected')} ${selectedIds.length}` : t('common.selectAll')}
             </span>
           </label>
-          <span className="text-xs text-muted-foreground">
-            {accounts.length === totalCount ? `共 ${totalCount} 个账号` : `${accounts.length} / ${totalCount} 个账号`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {accounts.length === totalCount ? `共 ${totalCount} 个账号` : `${accounts.length} / ${totalCount} 个账号`}
+            </span>
+            {selectedCount > 0 && (
+              <>
+                <button
+                  onClick={onBatchEdit}
+                  className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                  title={t('accounts.batchEditTagsAndGroups')}
+                >
+                  <Edit2 size={13} />{t('accounts.batchEdit')} ({selectedCount})
+                </button>
+                <button
+                  onClick={onBatchDelete}
+                  className="h-7 px-2.5 rounded-md text-white bg-gradient-to-r from-red-500 to-red-600 text-xs font-medium hover:opacity-90 inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                  title={t('accounts.batchDelete')}
+                >
+                  <Trash2 size={13} />删除 ({selectedCount})
+                </button>
+              </>
+            )}
+            <button
+              onClick={onAdd}
+              className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 inline-flex items-center gap-1 cursor-pointer"
+              title={t('common.addAccount')}
+            >
+              <Plus size={13} />{t('common.addAccount')}
+            </button>
+            <button
+              onClick={onExport}
+              className="h-7 px-2.5 rounded-md border border-border bg-card text-foreground text-xs font-medium hover:bg-muted/50 inline-flex items-center gap-1 cursor-pointer"
+              title={t('accounts.export')}
+            >
+              <Download size={13} />导出账号
+            </button>
+          </div>
         </div>
       )}
 

@@ -32,6 +32,7 @@ import AccountDetailModal from './AccountDetailModal'
 import EditAccountModal from './EditAccountModal'
 import BatchEditModal from './BatchEditModal'
 import ConfirmModal from './ConfirmModal'
+import GroupTagManager from './GroupTagManager'
 import { AccountListSkeleton, AccountTableSkeleton } from '../../shared/Skeleton'
 import { getThemeAccent } from '../KiroConfig/themeAccent'
 import { ListAvailableModelsResponse } from '../../../types/account'
@@ -55,6 +56,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
   const [editingLabelAccount, setEditingLabelAccount] = useState<any>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showBatchEditModal, setShowBatchEditModal] = useState(false)
+  const [showGroupManager, setShowGroupManager] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
@@ -402,6 +404,18 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
     return sorted.map(({ account }) => account)
   }, [advancedFilters, getTrialExpiry, getUsagePercent, normalizedAccounts, searchTerm, selectedGroup, selectedStatus, selectedTag, sortBy])
 
+  const hasActiveFilters = useMemo(() => Boolean(
+    searchTerm ||
+    selectedGroup ||
+    selectedTag ||
+    selectedStatus ||
+    advancedFilters?.usageRange ||
+    advancedFilters?.enabledStatus ||
+    advancedFilters?.subscriptions?.length ||
+    advancedFilters?.statuses?.length ||
+    advancedFilters?.providers?.length
+  ), [advancedFilters, searchTerm, selectedGroup, selectedStatus, selectedTag])
+
   const accountRowStateById = useMemo(() => {
     const result: Record<string, any> = {}
     for (const account of filteredAccounts) {
@@ -436,6 +450,22 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
   const handleSelectOne = useCallback((id: string, checked: boolean) => {
     setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id))
   }, [])
+
+  const closeGroupManager = useCallback(() => {
+    setShowGroupManager(false)
+    loadTagDefinitions()
+    loadGroupDefinitions()
+  }, [loadGroupDefinitions, loadTagDefinitions])
+
+  const handleExportSelected = useCallback(async () => {
+    if (selectedIds.length === 0) {
+      showError(t('accounts.exportSelectFirst') || '请先选择要导出的账号')
+      return
+    }
+    await handleExport(selectedIds)
+    setSelectedIds([])
+  }, [handleExport, selectedIds, t])
+
   const handleCopy = useCallback((text: string, id: string) => {
     navigator.clipboard.writeText(text).catch(e => console.error('Copy failed:', e))
     setCopiedId(id)
@@ -571,17 +601,8 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
         selectedCount={selectedIds.length}
-        onBatchDelete={onBatchDelete}
-        onBatchEdit={() => setShowBatchEditModal(true)}
         onImport={() => setShowImportModal(true)}
-        onExport={async () => {
-          if (selectedIds.length === 0) {
-            showError(t('accounts.exportSelectFirst') || '请先选择要导出的账号')
-            return
-          }
-          await handleExport(selectedIds)
-          setSelectedIds([]) // 清除选中状态
-        }}
+        onExport={handleExportSelected}
         onRefresh={loadAccounts}
         onRefreshAll={async () => {
           if (selectedIds.length === 0) {
@@ -591,6 +612,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           await batchRefreshAccounts(selectedIds, accounts)
           // 刷新不改变选择：保留全选状态，便于连续操作
         }}
+        onManageGroups={() => setShowGroupManager(true)}
         autoRefreshing={autoRefreshing}
         refreshProgress={refreshProgress}
         allGroups={groupDefinitions}
@@ -609,7 +631,6 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
         onAdvancedFiltersChange={setAdvancedFilters}
         totalCount={filteredAccounts.length}
         onSelectAll={handleSelectAll}
-        onDeselectAll={() => setSelectedIds([])}
       />
       <div className="flex-1 flex flex-col min-h-0">
       {loading ? (
@@ -623,14 +644,14 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
               </svg>
             </div>
             <h3 className="text-base font-semibold text-foreground mb-1.5">
-              {searchTerm || selectedGroup || selectedTag || selectedStatus ? '没有找到匹配的账号' : '还没有账号'}
+              {hasActiveFilters ? '没有找到匹配的账号' : '还没有账号'}
             </h3>
             <p className="text-xs text-muted-foreground mb-5">
-              {searchTerm || selectedGroup || selectedTag || selectedStatus
+              {hasActiveFilters
                 ? '试试调整筛选条件或搜索关键词'
                 : '导入账号开始管理你的 Kiro IDE 账户'}
             </p>
-            {!searchTerm && !selectedGroup && !selectedTag && !selectedStatus && (
+            {!hasActiveFilters && (
               <button
                 onClick={() => setShowImportModal(true)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r ${accent.gradientFrom} ${accent.gradientTo} shadow-md hover:shadow-lg transition-all duration-200 inline-flex items-center gap-1.5 cursor-pointer`}
@@ -661,6 +682,10 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           onDelete={handleDelete}
           onDeleteRemote={handleDeleteRemote}
           onAdd={() => setShowImportModal(true)}
+          onExport={handleExportSelected}
+          selectedCount={selectedIds.length}
+          onBatchEdit={() => setShowBatchEditModal(true)}
+          onBatchDelete={onBatchDelete}
           localToken={localToken}
           tagDefinitions={tagDefinitions}
           groupDefinitions={groupDefinitions}
@@ -687,6 +712,10 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           onDelete={handleDelete}
           onDeleteRemote={handleDeleteRemote}
           onAdd={() => setShowImportModal(true)}
+          onExport={handleExportSelected}
+          selectedCount={selectedIds.length}
+          onBatchEdit={() => setShowBatchEditModal(true)}
+          onBatchDelete={onBatchDelete}
           localToken={localToken}
           tagDefinitions={tagDefinitions}
           groupDefinitions={groupDefinitions}
@@ -764,6 +793,13 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
             loadTagDefinitions()
             setSelectedIds([])
           }}
+        />
+      )}
+      {showGroupManager && (
+        <GroupTagManager
+          defaultTab="groups"
+          onClose={closeGroupManager}
+          onSuccess={closeGroupManager}
         />
       )}
 

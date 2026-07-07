@@ -13,6 +13,7 @@ export interface AppSettings {
   autoSwitchThreshold: number;
   autoSwitchInterval: number;
   switchTarget: 'ide' | 'cli' | 'both';
+  closeToTray: boolean;
   enableCodebaseIndexing: boolean;
   enableTabAutocomplete: boolean;
   usageSummary: boolean;
@@ -44,14 +45,15 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null)
 const DEFAULT_SETTINGS: AppSettings = {
   lockModel: false,
   lockedModel: null,
-  autoRefresh: true,
+  autoRefresh: false,
   autoRefreshInterval: 50,
   browserPath: '',
-  privacyMode: true,
+  privacyMode: false,
   autoSwitchEnabled: false,
   autoSwitchThreshold: 1,
   autoSwitchInterval: 5,
   switchTarget: 'ide',
+  closeToTray: false,
   enableCodebaseIndexing: true,
   enableTabAutocomplete: true,
   usageSummary: true,

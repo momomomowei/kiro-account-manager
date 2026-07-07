@@ -4,8 +4,6 @@ import { getCurrentUser, logout as apiLogout } from './api/accountApi'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { Toaster } from 'react-hot-toast'
 import Sidebar from './components/features/Layout'
-import UpdateChecker from './components/shared/UpdateChecker'
-import WelcomeModal from './components/shared/WelcomeModal'
 import { dismissBootSplash } from './utils/bootSplash'
 
 import { useApp } from './hooks/useApp'
@@ -19,6 +17,10 @@ import { getMountedRouteIds, shouldPersistRoute } from './utils/routePersistence
 // 构建路由映射
 const routeMap = Object.fromEntries(routes.map(r => [r.id, r.component]))
 const allRoutes = { ...routeMap, ...internalRoutes }
+const getInitialActiveMenu = () => {
+  const savedMenu = localStorage.getItem('activeMenu')
+  return savedMenu && allRoutes[savedMenu] ? savedMenu : 'home'
+}
 
 // 页面加载骨架屏
 function PageLoading() {
@@ -32,11 +34,9 @@ function PageLoading() {
 
 function App() {
   const [user, setUser] = useState<any>(null)
-  const [activeMenu, setActiveMenu] = useState<string>(() => {
-    return localStorage.getItem('activeMenu') || 'home'
-  })
+  const [activeMenu, setActiveMenu] = useState<string>(getInitialActiveMenu)
   const [mountedRouteIds, setMountedRouteIds] = useState<string[]>(() =>
-    getMountedRouteIds([], localStorage.getItem('activeMenu') || 'home')
+    getMountedRouteIds([], getInitialActiveMenu())
   )
   const { t } = useApp()
   const { settings: appSettings, loading: settingsLoading } = useAppSettings()
@@ -179,8 +179,6 @@ function App() {
             </div>
           </main>
 
-          <UpdateChecker />
-          <WelcomeModal />
           <Toaster
             position="top-center"
             toastOptions={{

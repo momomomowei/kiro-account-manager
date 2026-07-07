@@ -11,12 +11,12 @@ interface PrivacyContextValue {
 const PrivacyContext = createContext<PrivacyContextValue | null>(null)
 
 export function PrivacyProvider({ children }: { children: ReactNode }) {
-  const [privacyMode, setPrivacyModeState] = useState(true) // 默认开启隐私模式
+  const [privacyMode, setPrivacyModeState] = useState(false) // 默认关闭隐私模式
 
   // 从后端加载设置
   useEffect(() => {
     getAppSettings<any>().then(settings => {
-      setPrivacyModeState(settings?.privacyMode ?? true) // 默认 true
+      setPrivacyModeState(settings?.privacyMode ?? false)
     }).catch(() => {})
   }, [])
 

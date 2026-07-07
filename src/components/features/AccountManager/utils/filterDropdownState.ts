@@ -13,6 +13,10 @@ const SPECIAL_TAG_LABELS = {
   __none__: '无标签',
   __has__: '有标签'}
 
+const ENABLED_STATUS_LABELS = {
+  enabled: '启用',
+  disabled: '禁用'}
+
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] || '' : values || ''
 }
@@ -75,6 +79,10 @@ export function buildFilterSummaryItems({
 
   if (filters?.usageRange) {
     items.push({ key: 'usageRange', label: '使用量', value: filters.usageRange })
+  }
+
+  if (filters?.enabledStatus) {
+    items.push({ key: 'enabledStatus', label: '启用状态', value: ENABLED_STATUS_LABELS[filters.enabledStatus] || filters.enabledStatus })
   }
 
   return items

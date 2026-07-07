@@ -1,19 +1,18 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, Download, Upload, RefreshCcw, RotateCw, Trash2, ArrowUp, ArrowDown, X, TrendingUp, Clock, Calendar, CheckSquare, Square, Sparkles, LayoutGrid, List, Edit } from 'lucide-react'
+import { Search, Download, Upload, RefreshCcw, RotateCw, X, Sparkles, LayoutGrid, List, FolderCog } from 'lucide-react'
 import { useApp } from '../../../hooks/useApp'
-import FilterDropdown from './FilterDropdown'
+import FilterDropdown, { PROVIDER_OPTIONS, STATUS_OPTIONS, SUBSCRIPTION_OPTIONS } from './FilterDropdown'
 import { getThemeAccent } from '../KiroConfig/themeAccent'
 
 interface AccountHeaderProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   selectedCount: number;
-  onBatchDelete: () => void;
-  onBatchEdit: () => void;
   onImport: () => void;
   onExport: () => void;
   onRefresh: () => void;
   onRefreshAll: () => void;
+  onManageGroups: () => void;
   autoRefreshing: boolean;
   refreshProgress: { current: number; total: number };
   allGroups?: any[];
@@ -32,7 +31,6 @@ interface AccountHeaderProps {
   onAdvancedFiltersChange: (filters: any) => void;
   totalCount?: number;
   onSelectAll: (checked?: boolean) => void;
-  onDeselectAll: () => void;
 }
 
 /**
@@ -70,16 +68,49 @@ function IconButton({ onClick, active, disabled, title, ariaLabel, accent, badge
   )
 }
 
+interface TopFilterSelectProps {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  accent: any;
+  className?: string;
+}
+
+function TopFilterSelect({ label, value, options, onChange, accent, className = 'w-[108px]' }: TopFilterSelectProps) {
+  const active = value !== ''
+  return (
+    <label
+      className={`h-8 rounded-md border inline-flex items-center px-2 transition-colors ${
+        active
+          ? `${accent.border} ${accent.bgSoft}`
+          : 'glass-card border-border hover:bg-muted/50'
+      }`}
+      title={label}
+    >
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${className} h-6 bg-transparent text-xs text-foreground outline-none cursor-pointer`}
+        aria-label={label}
+      >
+        {options.map(option => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function AccountHeader({
   searchTerm,
   onSearchChange,
   selectedCount,
-  onBatchDelete,
-  onBatchEdit,
   onImport,
   onExport,
   onRefresh,
   onRefreshAll,
+  onManageGroups,
   autoRefreshing,
   refreshProgress,
   allGroups = [],
@@ -98,7 +129,6 @@ function AccountHeader({
   onAdvancedFiltersChange,
   totalCount = 0,
   onSelectAll,
-  onDeselectAll,
 }: AccountHeaderProps) {
   const { t, theme } = useApp()
   const accent = useMemo(() => getThemeAccent(theme), [theme])
@@ -136,13 +166,35 @@ function AccountHeader({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [localSearchTerm, searchExpanded])
 
-  const sortOptions = [
-    { key: 'usage', label: t('sort.usage'), icon: TrendingUp },
-    { key: 'added', label: t('sort.added'), icon: Clock },
-    { key: 'trial', label: t('sort.trial'), icon: Calendar },
-  ]
+  // const sortOptions = [
+  //   { key: 'usage', label: t('sort.usage'), icon: TrendingUp },
+  //   { key: 'added', label: t('sort.added'), icon: Clock },
+  //   { key: 'trial', label: t('sort.trial'), icon: Calendar },
+  // ]
 
   const isBatchMode = selectedCount > 0
+  const groupOptions = useMemo(() => [
+    { value: '', label: '全部分组' },
+    { value: '__has__', label: t('groups.hasGroup') || '有分组' },
+    { value: '__none__', label: t('groups.noGroup') || '无分组' },
+    ...allGroups.map(group => ({
+      value: group.id,
+      label: group.name || group.id,
+    })),
+  ], [allGroups, t])
+  const subscriptionValue = advancedFilters.subscriptions?.[0] || ''
+  const statusValue = advancedFilters.statuses?.[0] || ''
+  const providerValue = advancedFilters.providers?.[0] || ''
+  const hasTopDropdownFilters = !!(subscriptionValue || statusValue || providerValue || selectedGroup)
+  const clearTopDropdownFilters = useCallback(() => {
+    onAdvancedFiltersChange({
+      ...advancedFilters,
+      subscriptions: [],
+      statuses: [],
+      providers: [],
+    })
+    onGroupFilter(null)
+  }, [advancedFilters, onAdvancedFiltersChange, onGroupFilter])
 
   return (
     <div className="border-b border-border bg-card/30 backdrop-blur-sm px-5 py-3">
@@ -170,151 +222,159 @@ function AccountHeader({
         </div>
 
         {/* 右侧：搜索 + 操作 */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {!isBatchMode && (
-            <>
-              {/* 搜索框 - 可收缩 */}
-              <div ref={searchRef} className="relative">
-                {searchExpanded || localSearchTerm ? (
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={13} />
-                    <input
-                      type="text"
-                      placeholder={t('accounts.search')}
-                      value={localSearchTerm}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      autoFocus
-                      className={`pl-8 pr-8 h-8 bg-muted/40 border border-transparent rounded-md text-xs w-44 focus:outline-none focus:ring-2 ${accent.ring} text-foreground transition-all`}
-                    />
-                    {localSearchTerm && (
-                      <button
-                        onClick={() => {
-                          setLocalSearchTerm('')
-                          onSearchChange('')
-                        }}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
-                        title={t('settings.clear')}
-                      >
-                        <X size={12} className="text-muted-foreground" />
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <IconButton
-                    onClick={() => setSearchExpanded(true)}
-                    title={t('accounts.search')}
-                    accent={accent}
+        <div className="flex items-center gap-1.5 flex-shrink-0 justify-end whitespace-nowrap">
+          {/* 搜索框 - 可收缩 */}
+          <div ref={searchRef} className="relative">
+            {searchExpanded || localSearchTerm ? (
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={13} />
+                <input
+                  type="text"
+                  placeholder={t('accounts.search')}
+                  value={localSearchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  autoFocus
+                  className={`pl-8 pr-8 h-8 bg-muted/40 border border-transparent rounded-md text-xs w-44 focus:outline-none focus:ring-2 ${accent.ring} text-foreground transition-all`}
+                />
+                {localSearchTerm && (
+                  <button
+                    onClick={() => {
+                      setLocalSearchTerm('')
+                      onSearchChange('')
+                    }}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+                    title={t('settings.clear')}
                   >
-                    <Search size={14} />
-                  </IconButton>
+                    <X size={12} className="text-muted-foreground" />
+                  </button>
                 )}
               </div>
-
-              {/* 排序按钮组 */}
-              <div className="flex gap-1 border border-border rounded-md p-0.5 bg-card/40">
-                {sortOptions.map(({ key, label, icon: Icon }) => {
-                  const isActive = sortBy.startsWith(key)
-                  const isDesc = sortBy.endsWith('Desc')
-                  return (
-                    <IconButton
-                      key={key}
-                      onClick={() => {
-                        if (isActive) {
-                          onSortChange(isDesc ? `${key}Asc` : 'default')
-                        } else {
-                          onSortChange(`${key}Desc`)
-                        }
-                      }}
-                      active={isActive}
-                      title={label}
-                      accent={accent}
-                      className="h-7 w-7 border-0"
-                      badge={isActive && (
-                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background shadow flex items-center justify-center ring-1 ring-border">
-                          {isDesc ? <ArrowDown size={9} className="text-foreground" /> : <ArrowUp size={9} className="text-foreground" />}
-                        </div>
-                      )}
-                    >
-                      <Icon size={13} />
-                    </IconButton>
-                  )
-                })}
-              </div>
-
-              {/* 视图切换 */}
-              <div className="flex gap-0.5 border border-border rounded-md p-0.5 bg-card/40">
-                <IconButton
-                  onClick={() => onViewModeChange('card')}
-                  active={viewMode === 'card'}
-                  title={t('accounts.cardView')}
-                  accent={accent}
-                  className="h-7 w-7 border-0"
-                >
-                  <LayoutGrid size={13} />
-                </IconButton>
-                <IconButton
-                  onClick={() => onViewModeChange('table')}
-                  active={viewMode === 'table'}
-                  title={t('accounts.tableView')}
-                  accent={accent}
-                  className="h-7 w-7 border-0"
-                >
-                  <List size={13} />
-                </IconButton>
-              </div>
-
-              {/* 筛选面板 */}
-              <FilterDropdown
-                filters={advancedFilters}
-                onFiltersChange={onAdvancedFiltersChange}
-                allGroups={allGroups}
-                selectedGroup={selectedGroup}
-                onGroupFilter={onGroupFilter}
-                allTags={allTags}
-                selectedTag={selectedTag}
-                onTagFilter={onTagFilter}
-                selectedStatus={selectedStatus}
-                onStatusFilter={onStatusFilter}
-                defaultGroupCollapsed={true}
-              />
-            </>
-          )}
-
-          {/* 批量操作 */}
-          {isBatchMode && (
-            <>
+            ) : (
               <IconButton
-                onClick={() => onSelectAll()}
-                title={t('common.selectAll')}
+                onClick={() => setSearchExpanded(true)}
+                title={t('accounts.search')}
                 accent={accent}
               >
-                <CheckSquare size={14} className={accent.text} />
+                <Search size={14} />
               </IconButton>
-              <IconButton
-                onClick={onDeselectAll}
-                title={t('session.deselectAll')}
-                accent={accent}
-              >
-                <Square size={14} />
-              </IconButton>
-              <button
-                onClick={onBatchEdit}
-                className={`px-3 h-8 text-xs font-medium rounded-md inline-flex items-center gap-1.5 cursor-pointer text-white shadow-sm bg-gradient-to-br ${accent.gradientFrom} ${accent.gradientTo} hover:opacity-90 transition-opacity`}
-                title={t('accounts.batchEditTagsAndGroups')}
-              >
-                <Edit size={13} />
-                {t('accounts.batchEdit')} ({selectedCount})
-              </button>
-              <button
-                onClick={onBatchDelete}
-                className="px-3 h-8 text-xs font-medium rounded-md inline-flex items-center gap-1.5 cursor-pointer text-white shadow-sm bg-gradient-to-r from-red-500 to-red-600 hover:opacity-90 transition-opacity"
-                title={t('accounts.batchDelete')}
-              >
-                <Trash2 size={13} />
-                ({selectedCount})
-              </button>
-            </>
-          )}
+            )}
+          </div>
+
+          {/* 排序按钮组 */}
+          {/*
+          <div className="flex gap-1 border border-border rounded-md p-0.5 bg-card/40">
+            {sortOptions.map(({ key, label, icon: Icon }) => {
+              const isActive = sortBy.startsWith(key)
+              const isDesc = sortBy.endsWith('Desc')
+              return (
+                <IconButton
+                  key={key}
+                  onClick={() => {
+                    if (isActive) {
+                      onSortChange(isDesc ? `${key}Asc` : 'default')
+                    } else {
+                      onSortChange(`${key}Desc`)
+                    }
+                  }}
+                  active={isActive}
+                  title={label}
+                  accent={accent}
+                  className="h-7 w-7 border-0"
+                  badge={isActive && (
+                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background shadow flex items-center justify-center ring-1 ring-border">
+                      {isDesc ? <ArrowDown size={9} className="text-foreground" /> : <ArrowUp size={9} className="text-foreground" />}
+                    </div>
+                  )}
+                >
+                  <Icon size={13} />
+                </IconButton>
+              )
+            })}
+          </div>
+          */}
+
+          {/* 常用筛选 */}
+          <div className="flex items-center gap-1">
+            <TopFilterSelect
+              label="订阅"
+              value={subscriptionValue}
+              options={SUBSCRIPTION_OPTIONS}
+              onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, subscriptions: value ? [value] : [] })}
+              accent={accent}
+            />
+            <TopFilterSelect
+              label="状态"
+              value={statusValue}
+              options={STATUS_OPTIONS}
+              onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, statuses: value ? [value] : [] })}
+              accent={accent}
+              className="w-[86px]"
+            />
+            <TopFilterSelect
+              label="类型"
+              value={providerValue}
+              options={PROVIDER_OPTIONS}
+              onChange={(value) => onAdvancedFiltersChange({ ...advancedFilters, providers: value ? [value] : [] })}
+              accent={accent}
+              className="w-[96px]"
+            />
+            <TopFilterSelect
+              label="分组"
+              value={selectedGroup || ''}
+              options={groupOptions}
+              onChange={(value) => onGroupFilter(value || null)}
+              accent={accent}
+              className="w-[112px]"
+            />
+            <IconButton
+              onClick={clearTopDropdownFilters}
+              disabled={!hasTopDropdownFilters}
+              title="清除下拉筛选"
+              accent={accent}
+            >
+              <X size={14} className={hasTopDropdownFilters ? accent.text : ''} />
+            </IconButton>
+          </div>
+
+          {/* 视图切换 */}
+          <div className="flex gap-0.5 border border-border rounded-md p-0.5 bg-card/40">
+            <IconButton
+              onClick={() => onViewModeChange('card')}
+              active={viewMode === 'card'}
+              title={t('accounts.cardView')}
+              accent={accent}
+              className="h-7 w-7 border-0"
+            >
+              <LayoutGrid size={13} />
+            </IconButton>
+            <IconButton
+              onClick={() => onViewModeChange('table')}
+              active={viewMode === 'table'}
+              title={t('accounts.tableView')}
+              accent={accent}
+              className="h-7 w-7 border-0"
+            >
+              <List size={13} />
+            </IconButton>
+          </div>
+
+          {/* 筛选面板 */}
+          <FilterDropdown
+            filters={advancedFilters}
+            onFiltersChange={onAdvancedFiltersChange}
+            allGroups={allGroups}
+            selectedGroup={selectedGroup}
+            onGroupFilter={onGroupFilter}
+            allTags={allTags}
+            selectedTag={selectedTag}
+            onTagFilter={onTagFilter}
+            selectedStatus={selectedStatus}
+            onStatusFilter={onStatusFilter}
+            defaultGroupCollapsed={true}
+          />
+          <IconButton onClick={onManageGroups} title="分组管理" accent={accent}>
+            <FolderCog size={14} className={accent.text} />
+          </IconButton>
 
           {/* 通用操作按钮组 */}
           <div className="flex gap-1 ml-1">
