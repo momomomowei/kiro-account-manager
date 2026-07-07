@@ -594,6 +594,15 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
     setSelectedIds([]) // 清除选中状态
   }, [accounts, selectedIds, localToken, removeAccountsLocally, showConfirm, t])
 
+  const handleRefreshSelected = useCallback(async () => {
+    if (selectedIds.length === 0) {
+      showError(t('accounts.refreshSelectFirst') || '请先选择要刷新的账号')
+      return
+    }
+    await batchRefreshAccounts(selectedIds, accounts)
+    // 刷新不改变选择：保留全选状态，便于连续操作
+  }, [accounts, batchRefreshAccounts, selectedIds, showError, t])
+
   return (
     <div className={cn('h-full flex flex-col', "glass-main")}>
       <div className="flex-1 flex flex-col min-h-0">
@@ -604,14 +613,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
         onImport={() => setShowImportModal(true)}
         onExport={handleExportSelected}
         onRefresh={loadAccounts}
-        onRefreshAll={async () => {
-          if (selectedIds.length === 0) {
-            showError(t('accounts.refreshSelectFirst') || '请先选择要刷新的账号')
-            return
-          }
-          await batchRefreshAccounts(selectedIds, accounts)
-          // 刷新不改变选择：保留全选状态，便于连续操作
-        }}
+        onRefreshAll={handleRefreshSelected}
         onManageGroups={() => setShowGroupManager(true)}
         autoRefreshing={autoRefreshing}
         refreshProgress={refreshProgress}
@@ -684,7 +686,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           onAdd={() => setShowImportModal(true)}
           onExport={handleExportSelected}
           selectedCount={selectedIds.length}
-          onBatchRefresh={loadAccounts}
+          onBatchRefresh={handleRefreshSelected}
           onBatchEdit={() => setShowBatchEditModal(true)}
           onBatchDelete={onBatchDelete}
           localToken={localToken}
@@ -715,7 +717,7 @@ function AccountManager({ onNavigate }: AccountManagerProps) {
           onAdd={() => setShowImportModal(true)}
           onExport={handleExportSelected}
           selectedCount={selectedIds.length}
-          onBatchRefresh={loadAccounts}
+          onBatchRefresh={handleRefreshSelected}
           onBatchEdit={() => setShowBatchEditModal(true)}
           onBatchDelete={onBatchDelete}
           localToken={localToken}
